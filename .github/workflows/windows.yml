@@ -1,7 +1,14 @@
 name: Windows
 # 触发规则详解 https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#on
-on: 
+on:
   push:
+    # 必须显式声明 branches：一旦出现 tags 过滤器而未声明 branches，
+    # 分支推送将不再触发本 workflow。
+    # paths 过滤器**不参与** tag 推送判定，所以打 tag 时总会构建。
+    branches:
+      - '**'
+    tags:
+      - 'v*'
     paths:
       - 'QtScrcpy/**'
       - '!QtScrcpy/res/**'
@@ -13,6 +20,11 @@ on:
       - '!QtScrcpy/res/**'
       - '.github/workflows/windows.yml'
       - 'ci/win**'
+  # 允许手动触发（默认跑当前分支，不会命中 refs/tags/，因此不会发 release）
+  workflow_dispatch:
+# upload-release-action 需要写权限；仓库默认可能是只读
+permissions:
+  contents: write
 jobs:
   build:
     name: Build
@@ -64,11 +76,10 @@ jobs:
           arch: ${{ matrix.qt-arch }}
           cached: ${{ steps.cache-qt.outputs.cache-hit }}
       # 拉取代码
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: 'true'
-          ssh-key: ${{ secrets.BOT_SSH_KEY }}
       # 编译msvc
       - name: Build MSVC
         # shell介绍 https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
@@ -84,7 +95,7 @@ jobs:
         shell: bash
         id: get-version
         # ${ GITHUB_REF/refs\/tags\// }是linux shell ${}的变量替换语法
-        run: echo ::set-output name=version::${GITHUB_REF##*/}
+        run: echo "version=${GITHUB_REF##*/}" >> "$GITHUB_OUTPUT"
       # tag 打包
       - name: Package
         id: package
@@ -96,8 +107,8 @@ jobs:
         run: |
           cmd.exe /c ci\win\publish_for_win.bat ${{ matrix.msvc-arch }} ..\build\${{ env.publish_name }}
           # 打包zip
-          Compress-Archive -Path ci\build\${{ env.publish_name }} ci\build\${{ env.publish_name }}.zip
-          echo "::set-output name=package-name::${{ env.publish_name }}"
+          Compress-Archive -Path ci\build\${{ env.publish_name }} -DestinationPath ci\build\${{ env.publish_name }}.zip
+          "package-name=${{ env.publish_name }}" >> $env:GITHUB_OUTPUT
       # 上传artifacts
       # https://help.github.com/en/actions/configuring-and-managing-workflows/persisting-workflow-data-using-artifacts
       - uses: actions/upload-artifact@v4
@@ -107,10 +118,13 @@ jobs:
       # Upload to release
       - name: Upload Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v1-release
+        # v1-release 这个 ref 早已不存在（action 只保留 v2 与版本号 tag），
+        # 原来这步即使被触发也会在下载 action 阶段失败。
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ci\build\${{ steps.package.outputs.package-name }}.zip
           asset_name: ${{ steps.package.outputs.package-name }}.zip
-          tag: ${{ github.ref }}
+          # tag: ${{ github.ref }} 传的是 refs/tags/x 全名，这里用 ref_name 只取 tag 名
+          tag: ${{ github.ref_name }}
           overwrite: true
