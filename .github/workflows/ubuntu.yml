@@ -12,6 +12,10 @@ on:
       - '!QtScrcpy/res/**'
       - '.github/workflows/ubuntu.yml'
       - 'ci/linux/**'
+# upload-release-action 需要写权限；仓库默认可能是只读（否则报
+# "Resource not accessible by integration"）
+permissions:
+  contents: write
 jobs:
   build:
     name: Build
@@ -137,5 +141,6 @@ jobs:
           file: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.gcc-arch }}-${{ steps.get-version.outputs.version }}.AppImage
           asset_name: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.gcc-arch }}-${{ steps.get-version.outputs.version }}.AppImage
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref }}
+          # 传 github.ref 会得到 refs/tags/x 全名，这里只用 tag 名
+          tag: ${{ github.ref_name }}
           overwrite: true

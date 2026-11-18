@@ -10,6 +10,9 @@ on:
       - 'QtScrcpy/**'
       - '!QtScrcpy/res/**'
       - '.github/workflows/macos.yml'
+# upload-release-action 需要写权限；仓库默认可能是只读
+permissions:
+  contents: write
 jobs:
   build:
     name: Build
@@ -92,10 +95,11 @@ jobs:
       # Upload to release
       - name: Upload Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v1-release
+        # v1-release 这个 ref 已不存在（action 只保留 v2 与版本号 tag）
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ci/build/${{ steps.package.outputs.package-name }}.dmg
           asset_name: ${{ steps.package.outputs.package-name }}.dmg
-          tag: ${{ github.ref }}
+          tag: ${{ github.ref_name }}
           overwrite: true
