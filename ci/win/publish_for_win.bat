@@ -74,6 +74,11 @@ xcopy %jar_path% %publish_path% /Y
 xcopy %keymap_path% %publish_path%keymap\ /E /Y
 xcopy %config_path% %publish_path%config\ /E /Y
 
+:: 删除调试符号，否则 xcopy 会把 pdb/ilk/lib 一起打进发布包
+del /q "%publish_path%*.pdb" 2>nul
+del /q "%publish_path%*.ilk" 2>nul
+del /q "%publish_path%*.lib" 2>nul
+
 :: 添加qt依赖包
 windeployqt %publish_path%\QtScrcpy.exe
 
